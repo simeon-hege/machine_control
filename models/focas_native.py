@@ -156,6 +156,17 @@ class FocasClient:
         ]
         self._lib.cnc_rdmacro.restype = ctypes.c_short
 
+        # Optional: relative/preset axis position write (used for direct jog)
+        if hasattr(self._lib, 'cnc_wrrelpos'):
+            # Signature guessed conservatively: (handle, axis_index, relative_pos, decimals)
+            # relative_pos is a scaled integer similar to cnc_wrmacro usage.
+            try:
+                self._lib.cnc_wrrelpos.argtypes = [ctypes.c_ushort, ctypes.c_short, ctypes.c_long, ctypes.c_short]
+                self._lib.cnc_wrrelpos.restype = ctypes.c_short
+            except Exception:
+                # If setting argtypes fails, don't block library usage.
+                pass
+
     def _check(self, func_name, result_code):
         if result_code != EW_OK:
             raise FocasError(func_name, int(result_code))
@@ -277,3 +288,38 @@ class FocasClient:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
+
+    def probe_jog_symbols(self):
+        """Return a list of candidate jog-related symbols present in the loaded library.
+        This does not call any of them; it only reports which symbols exist so the
+        caller can decide which to use. Safe to call.
+        """
+        candidates = [
+            'cnc_jog', 'cnc_jogstart', 'cnc_jogcmd', 'cnc_jogmove',
+            'cnc_jogunit', 'cnc_refjog', 'cnc_servojog', 'cnc_actjog',
+            'cnc_wrrelpos',
+        ]
+        found = []
+        for name in candidates:
+            if hasattr(self._lib, name):
+                found.append(name)
+        return found
+
+    def wrrelpos(self, axis_index, value, decimals=4):
+        """Set a relative/preset position for the given axis.
+
+        This is a thin wrapper around the native `cnc_wrrelpos` function.
+        The function scales `value` by `10**decimals` and calls the C API.
+        If the symbol is not available, an AttributeError is raised.
+        """
+        if not hasattr(self._lib, 'cnc_wrrelpos'):
+            raise AttributeError('cnc_wrrelpos not available in loaded library')
+        decimals = int(decimals)
+        scaled_value = int(round(float(value) * (10 ** decimals)))
+        rc = self._lib.cnc_wrrelpos(
+            self._handle,
+            int(axis_index),
+            scaled_value,
+            decimals,
+        )
+        self._check('cnc_wrrelpos', rc)

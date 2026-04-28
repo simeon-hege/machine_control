@@ -20,6 +20,7 @@
       <field name="arch" type="xml">
         <form string="FANUC CNC Device">
           <header>
+            <button name="action_open_live" type="object" string="Live View" class="oe_link"/>
             <button name="action_read_position" type="object" string="Read Position Now" class="oe_highlight"/>
             <button name="action_write_macro" type="object" string="Write Macro"/>
           </header>
