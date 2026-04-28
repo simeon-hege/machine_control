@@ -3,6 +3,7 @@
 import ctypes
 import os
 import platform
+from decimal import Decimal
 
 
 EW_OK = 0
@@ -17,7 +18,7 @@ class FocasError(Exception):
 
 class POSELM(ctypes.Structure):
     _fields_ = [
-        ("data", ctypes.c_long),
+        ("data", ctypes.c_int32),
         ("dec", ctypes.c_short),
         ("unit", ctypes.c_short),
         ("disp", ctypes.c_short),
@@ -51,7 +52,7 @@ class ODBM(ctypes.Structure):
     _fields_ = [
         ("datano", ctypes.c_short),
         ("dummy", ctypes.c_short),
-        ("mcr_val", ctypes.c_long),
+        ("mcr_val", ctypes.c_int32),
         ("dec_val", ctypes.c_short),
     ]
 
@@ -172,7 +173,7 @@ class FocasClient:
         return {
             "raw": int(pose.data),
             "dec": decimals,
-            "value": float(pose.data) / scale,
+            "value": float(int(pose.data) / scale),
             "unit": int(pose.unit),
             "disp": int(pose.disp),
             "name": FocasClient._decode_ascii(pose.name),
@@ -257,6 +258,20 @@ class FocasClient:
         }
 
     def __enter__(self):
+        # Ensure a benign fwlibeth.log exists in the current working
+        # directory. The fwlib native library attempts to open a
+        # relative-named "fwlibeth.log" and will abort if it's missing.
+        try:
+            cwd_log = os.path.join(os.getcwd(), "fwlibeth.log")
+            if not os.path.exists(cwd_log):
+                open(cwd_log, "a").close()
+                try:
+                    os.chmod(cwd_log, 0o644)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         self.connect()
         return self
 

@@ -52,6 +52,15 @@
                   <tree>
                     <field name="read_at"/>
                     <field name="status"/>
+                    <field name="absolute_x"/>
+                    <field name="absolute_y"/>
+                    <field name="absolute_z"/>
+                    <field name="relative_x"/>
+                    <field name="relative_y"/>
+                    <field name="relative_z"/>
+                    <field name="machine_x"/>
+                    <field name="machine_y"/>
+                    <field name="machine_z"/>
                     <field name="error_message"/>
                   </tree>
                 </field>
@@ -70,6 +79,15 @@
           <field name="read_at"/>
           <field name="device_id"/>
           <field name="status"/>
+          <field name="absolute_x"/>
+          <field name="absolute_y"/>
+          <field name="absolute_z"/>
+          <field name="relative_x"/>
+          <field name="relative_y"/>
+          <field name="relative_z"/>
+          <field name="machine_x"/>
+          <field name="machine_y"/>
+          <field name="machine_z"/>
           <field name="error_message"/>
         </tree>
       </field>
@@ -85,6 +103,26 @@
               <field name="device_id" readonly="1"/>
               <field name="read_at" readonly="1"/>
               <field name="status" readonly="1"/>
+            </group>
+            <group string="Coordinates" colspan="3">
+              <group string="Absolute">
+                <field name="absolute_x"/>
+                <field name="absolute_y"/>
+                <field name="absolute_z"/>
+                <field name="absolute_a"/>
+              </group>
+              <group string="Relative">
+                <field name="relative_x"/>
+                <field name="relative_y"/>
+                <field name="relative_z"/>
+                <field name="relative_a"/>
+              </group>
+              <group string="Machine">
+                <field name="machine_x"/>
+                <field name="machine_y"/>
+                <field name="machine_z"/>
+                <field name="machine_a"/>
+              </group>
             </group>
             <group>
               <field name="error_message" readonly="1"/>

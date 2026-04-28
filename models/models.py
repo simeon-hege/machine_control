@@ -2,7 +2,6 @@
 
 import json
 import logging
-import threading
 
 from odoo import fields, models, _
 from odoo.exceptions import UserError
@@ -11,7 +10,6 @@ from .focas_native import FocasClient, FocasError
 
 
 _logger = logging.getLogger(__name__)
-_FWLIB_LOCK = threading.Lock()
 
 
 class MachineControlCncDevice(models.Model):
@@ -42,33 +40,79 @@ class MachineControlCncDevice(models.Model):
 		return json.dumps(payload, indent=2, sort_keys=True, default=str)
 
 	def _create_snapshot(self, status, payload=None, error_message=None):
-		self.env['machine_control.cnc.snapshot'].create({
+		vals = {
 			'device_id': self.id,
 			'read_at': fields.Datetime.now(),
 			'status': status,
 			'error_message': error_message,
 			'payload': self._serialize_payload(payload) if payload else False,
-		})
+		}
+
+		# If position payload is present and OK, extract axis coordinates
+		# into separate fields (absolute/relative/machine for x,y,z,a).
+		try:
+			if payload and 'position' in payload and 'data' in payload['position']:
+				axis_list = payload['position']['data']
+				names = ['x', 'y', 'z', 'a']
+				for axis in axis_list[:4]:
+					idx = int(axis.get('axis_index', 0))
+					if idx < 0 or idx >= len(names):
+						continue
+					n = names[idx]
+					# Coerce values to numbers or False to avoid assignment errors
+					_abs = axis.get('absolute') or {}
+					_rel = axis.get('relative') or {}
+					_mac = axis.get('machine') or {}
+					_abs_val = _abs.get('value')
+					_rel_val = _rel.get('value')
+					_mac_val = _mac.get('value')
+					# If the library returned None or an implausible float, try to
+					# reconstruct the value from raw and dec fields using Decimal
+					from decimal import Decimal, InvalidOperation
+					def compute_from_raw(dct):
+						r = dct.get('raw')
+						d = dct.get('dec')
+						if r is None or d is None:
+							return None
+						try:
+							return float(Decimal(int(r)) / (Decimal(10) ** Decimal(int(d))))
+						except (InvalidOperation, OverflowError, ValueError):
+							return None
+
+					if _abs_val is None:
+						_abs_val = compute_from_raw(_abs)
+					if _rel_val is None:
+						_rel_val = compute_from_raw(_rel)
+					if _mac_val is None:
+						_mac_val = compute_from_raw(_mac)
+					vals[f'absolute_{n}'] = _abs_val if _abs_val is not None else False
+					vals[f'relative_{n}'] = _rel_val if _rel_val is not None else False
+					vals[f'machine_{n}'] = _mac_val if _mac_val is not None else False
+		except Exception:
+			# Do not fail snapshot creation on unexpected payload shape
+			pass
+
+		self.env['machine_control.cnc.snapshot'].create(vals)
 
 	def action_read_position(self):
 		self.ensure_one()
-
+		
 		try:
-			with _FWLIB_LOCK:
-				with FocasClient(self.host, self.port, self.timeout) as focas:
-					sysinfo = focas.read_sysinfo()
-					position = focas.read_position()
-
-					payload = {
-						'device': self.name,
-						'host': self.host,
-						'port': self.port,
-						'sysinfo': sysinfo,
-						'position': {
-							'method': 'cnc_rdposition',
-							'data': position,
-						},
-					}
+			with FocasClient(self.host, self.port, self.timeout) as focas:
+				print('-----------------------------------------')
+				sysinfo = focas.read_sysinfo()
+				position = focas.read_position()
+				
+				payload = {
+					'device': self.name,
+					'host': self.host,
+					'port': self.port,
+					'sysinfo': sysinfo,
+					'position': {
+						'method': 'cnc_rdposition',
+						'data': position,
+					},
+				}
 
 			serialized = self._serialize_payload(payload)
 			self.write({
@@ -99,10 +143,9 @@ class MachineControlCncDevice(models.Model):
 			raise UserError(_('Macro number must be greater than 0.'))
 
 		try:
-			with _FWLIB_LOCK:
-				with FocasClient(self.host, self.port, self.timeout) as focas:
-					focas.write_macro(self.macro_no, self.macro_value, self.macro_decimals)
-					read_back = focas.read_macro(self.macro_no)
+			with FocasClient(self.host, self.port, self.timeout) as focas:
+				focas.write_macro(self.macro_no, self.macro_value, self.macro_decimals)
+				read_back = focas.read_macro(self.macro_no)
 
 			payload = {
 				'device': self.name,
@@ -150,3 +193,19 @@ class MachineControlCncSnapshot(models.Model):
 	], required=True)
 	error_message = fields.Text()
 	payload = fields.Text()
+
+	# Separate coordinate fields for easier display and searching
+	absolute_x = fields.Float(string='Absolute X', digits=(16, 6))
+	absolute_y = fields.Float(string='Absolute Y', digits=(16, 6))
+	absolute_z = fields.Float(string='Absolute Z', digits=(16, 6))
+	absolute_a = fields.Float(string='Absolute A', digits=(16, 6))
+
+	relative_x = fields.Float(string='Relative X', digits=(16, 6))
+	relative_y = fields.Float(string='Relative Y', digits=(16, 6))
+	relative_z = fields.Float(string='Relative Z', digits=(16, 6))
+	relative_a = fields.Float(string='Relative A', digits=(16, 6))
+
+	machine_x = fields.Float(string='Machine X', digits=(16, 6))
+	machine_y = fields.Float(string='Machine Y', digits=(16, 6))
+	machine_z = fields.Float(string='Machine Z', digits=(16, 6))
+	machine_a = fields.Float(string='Machine A', digits=(16, 6))
