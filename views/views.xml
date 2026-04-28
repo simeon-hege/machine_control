@@ -21,6 +21,7 @@
         <form string="FANUC CNC Device">
           <header>
             <button name="action_read_position" type="object" string="Read Position Now" class="oe_highlight"/>
+            <button name="action_write_macro" type="object" string="Write Macro"/>
           </header>
           <sheet>
             <group>
@@ -35,6 +36,11 @@
                 <field name="last_read_at" readonly="1"/>
                 <field name="last_status" readonly="1"/>
               </group>
+            </group>
+            <group string="Macro Write">
+              <field name="macro_no"/>
+              <field name="macro_value"/>
+              <field name="macro_decimals"/>
             </group>
             <notebook>
               <page string="Last Read">

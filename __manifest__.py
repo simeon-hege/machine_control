@@ -6,7 +6,7 @@
 
     'description': """
         Configure FANUC CNC controllers and read live axis position data and controll the machine
-        using the installed pyfwlib/fwlib Python extension.
+        using a bundled native FOCAS fwlib shared library loaded directly via ctypes.
     """,
 
     'author': "Simeon Hege",
