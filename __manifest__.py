@@ -20,16 +20,24 @@
     'license': 'LGPL-3',
 
     # any module necessary for this one to work correctly
-    'depends': ['base'],
+    'depends': ['base', 'web', 'bus'],
 
     # always loaded
     'data': [
         'security/ir.model.access.csv',
         'views/views.xml',
-        'views/templates.xml',
     ],
     # only loaded in demonstration mode
     'demo': [
         'demo/demo.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'machine_control/static/src/js/live_view_action.js',
+            'machine_control/static/src/scss/live_view_action.scss',
+        ],
+        'web.assets_qweb': [
+            'machine_control/static/src/xml/live_view_action.xml',
+        ],
+    },
 }

@@ -1,0 +1,115 @@
+.o_machine_control_live_view {
+    max-width: 1200px;
+    margin: 16px auto;
+    padding: 16px;
+
+    .mc_header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+        }
+
+        .mc_device_name {
+            font-weight: 700;
+        }
+    }
+
+    .mc_status_wrap {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .mc_status {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 999px;
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+
+        &.is-ok {
+            background: #1f8f4f;
+        }
+
+        &.is-error {
+            background: #be2f2f;
+        }
+
+        &.is-unknown {
+            background: #6b7280;
+        }
+    }
+
+    .mc_last_read {
+        font-size: 13px;
+        color: #5b6370;
+    }
+
+    .mc_grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(220px, 1fr));
+        gap: 12px;
+
+        &.is-loading {
+            opacity: 0.6;
+        }
+    }
+
+    .mc_axis_col {
+        background: #111827;
+        color: #f9fafb;
+        border-radius: 10px;
+        padding: 12px;
+
+        h3 {
+            margin: 0 0 10px;
+            font-size: 18px;
+        }
+    }
+
+    .mc_axis_values {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .mc_val {
+        background: #1f2937;
+        border-radius: 8px;
+        padding: 8px;
+        text-align: center;
+
+        span {
+            display: block;
+            font-size: 12px;
+            color: #9ca3af;
+            margin-bottom: 2px;
+        }
+
+        strong {
+            font-size: 22px;
+            line-height: 1.1;
+        }
+    }
+
+    .mc_jog_controls {
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        input {
+            width: 90px;
+        }
+    }
+}

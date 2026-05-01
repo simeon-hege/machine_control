@@ -38,65 +38,8 @@ class MachineControlCncDevice(models.Model):
 	last_error = fields.Text(readonly=True)
 	last_position_data = fields.Text(readonly=True)
 
-	snapshot_ids = fields.One2many('machine_control.cnc.snapshot', 'device_id', string='Snapshots', readonly=True)
-
 	def _serialize_payload(self, payload):
 		return json.dumps(payload, indent=2, sort_keys=True, default=str)
-
-	def _create_snapshot(self, status, payload=None, error_message=None):
-		vals = {
-			'device_id': self.id,
-			'read_at': fields.Datetime.now(),
-			'status': status,
-			'error_message': error_message,
-			'payload': self._serialize_payload(payload) if payload else False,
-		}
-
-		# If position payload is present and OK, extract axis coordinates
-		# into separate fields (absolute/relative/machine for x,y,z,a).
-		try:
-			if payload and 'position' in payload and 'data' in payload['position']:
-				axis_list = payload['position']['data']
-				names = ['x', 'y', 'z', 'a']
-				for axis in axis_list[:4]:
-					idx = int(axis.get('axis_index', 0))
-					if idx < 0 or idx >= len(names):
-						continue
-					n = names[idx]
-					# Coerce values to numbers or False to avoid assignment errors
-					_abs = axis.get('absolute') or {}
-					_rel = axis.get('relative') or {}
-					_mac = axis.get('machine') or {}
-					_abs_val = _abs.get('value')
-					_rel_val = _rel.get('value')
-					_mac_val = _mac.get('value')
-					# If the library returned None or an implausible float, try to
-					# reconstruct the value from raw and dec fields using Decimal
-					from decimal import Decimal, InvalidOperation
-					def compute_from_raw(dct):
-						r = dct.get('raw')
-						d = dct.get('dec')
-						if r is None or d is None:
-							return None
-						try:
-							return float(Decimal(int(r)) / (Decimal(10) ** Decimal(int(d))))
-						except (InvalidOperation, OverflowError, ValueError):
-							return None
-
-					if _abs_val is None:
-						_abs_val = compute_from_raw(_abs)
-					if _rel_val is None:
-						_rel_val = compute_from_raw(_rel)
-					if _mac_val is None:
-						_mac_val = compute_from_raw(_mac)
-					vals[f'absolute_{n}'] = _abs_val if _abs_val is not None else False
-					vals[f'relative_{n}'] = _rel_val if _rel_val is not None else False
-					vals[f'machine_{n}'] = _mac_val if _mac_val is not None else False
-		except Exception:
-			# Do not fail snapshot creation on unexpected payload shape
-			pass
-
-		self.env['machine_control.cnc.snapshot'].create(vals)
 
 	def action_read_position(self):
 		self.ensure_one()
@@ -124,7 +67,6 @@ class MachineControlCncDevice(models.Model):
 				'last_error': False,
 				'last_position_data': serialized,
 			})
-			self._create_snapshot('ok', payload=payload)
 		except (FocasError, OSError) as exc:
 			message = str(exc)
 			self.write({
@@ -132,7 +74,6 @@ class MachineControlCncDevice(models.Model):
 				'last_status': 'error',
 				'last_error': message,
 			})
-			self._create_snapshot('error', error_message=message)
 			raise UserError(_('Failed to read FANUC position data: %s') % message) from exc
 		except Exception as exc:
 			_logger.exception('Unexpected FANUC read error')
@@ -239,7 +180,6 @@ class MachineControlCncDevice(models.Model):
 				'last_error': False,
 				'last_position_data': serialized,
 			})
-			self._create_snapshot('ok', payload=payload)
 		except (FocasError, OSError) as exc:
 			message = str(exc)
 			self.write({
@@ -247,19 +187,103 @@ class MachineControlCncDevice(models.Model):
 				'last_status': 'error',
 				'last_error': message,
 			})
-			self._create_snapshot('error', error_message=message)
 			raise UserError(_('Failed to write FANUC macro: %s') % message) from exc
 
 		return True
 
 	def action_open_live(self):
-		"""Return an action that opens the live view for this device in a new tab."""
+		"""Open the backend OWL live view for this device."""
 		self.ensure_one()
 		return {
-			'type': 'ir.actions.act_url',
-			'url': '/machine_control/device/%s/live' % (self.id,),
-			'target': 'new',
+			'type': 'ir.actions.client',
+			'tag': 'machine_control.live_view',
+			'name': _('Live: %s') % self.name,
+			'params': {
+				'device_id': self.id,
+				'device_name': self.name,
+			},
+			'target': 'current',
 		}
+
+	def _get_latest_live_payload(self):
+		self.ensure_one()
+		live = self.env['machine_control.cnc.live'].sudo().search([
+			('device_id', '=', self.id),
+		], order='ts desc', limit=1)
+		if live:
+			try:
+				payload = json.loads(live.payload) if live.payload else None
+			except Exception:
+				payload = None
+			return {
+				'status': self.last_status or 'ok',
+				'last_read_at': str(live.ts) if live.ts else None,
+				'payload': payload,
+			}
+
+		try:
+			payload = json.loads(self.last_position_data) if self.last_position_data else None
+		except Exception:
+			payload = None
+		return {
+			'status': self.last_status or 'ok',
+			'last_read_at': str(self.last_read_at) if self.last_read_at else None,
+			'payload': payload,
+		}
+
+	def get_live_data(self, refresh=False):
+		"""RPC method used by the OWL live view."""
+		self.ensure_one()
+		device = self.sudo()
+		if refresh:
+			result = device.read_position_no_snapshot()
+			if result.get('status') == 'ok':
+				return {
+					'status': 'ok',
+					'last_read_at': str(device.last_read_at) if device.last_read_at else None,
+					'payload': result.get('payload'),
+				}
+			return {
+				'status': 'error',
+				'last_read_at': str(device.last_read_at) if device.last_read_at else None,
+				'error': result.get('error'),
+				'payload': None,
+			}
+		return device._get_latest_live_payload()
+
+	def get_live_update(self, last_seen=None, timeout=30.0, poll_interval=1.0):
+		"""Long-poll RPC endpoint for the OWL live view."""
+		self.ensure_one()
+		device = self.sudo()
+		start = time.time()
+		timeout = max(float(timeout or 0.0), 1.0)
+		poll_interval = max(float(poll_interval or 0.0), 0.1)
+
+		current = device._get_latest_live_payload()
+		if current.get('last_read_at') != last_seen:
+			return current
+
+		while time.time() - start < timeout:
+			time.sleep(poll_interval)
+			current = device._get_latest_live_payload()
+			if current.get('last_read_at') != last_seen:
+				return current
+
+		return current
+
+	def jog_from_live(self, axis, value):
+		"""RPC helper used by the OWL live view jog controls."""
+		self.ensure_one()
+		if axis is None or value is None:
+			return {'result': 'error', 'error': 'axis and value required'}
+		try:
+			res = self.sudo()._jog_axis(axis, value)
+			if isinstance(res, dict) and 'candidates' in res:
+				return {'result': 'ok', 'candidates': res['candidates']}
+			return {'result': 'ok', 'read_back': res}
+		except Exception as exc:
+			_logger.exception('jog failed for device=%s axis=%s', self.id, axis)
+			return {'result': 'error', 'error': str(exc)}
 
 	def _jog_axis(self, axis, value):
 		"""Send a jog command for the given axis.
@@ -345,11 +369,26 @@ def _background_updater(registry):
 						# sampling failed for this device; skip
 						continue
 					payload = res.get('payload')
+					ts = fields.Datetime.now()
 					# persist a lightweight live row to avoid updating the same device row
 					try:
-						env['machine_control.cnc.live'].create({'device_id': dev.id, 'ts': fields.Datetime.now(), 'payload': json.dumps(payload, default=str)})
+						env['machine_control.cnc.live'].create({'device_id': dev.id, 'ts': ts, 'payload': json.dumps(payload, default=str)})
 					except Exception:
 						_logger.exception('failed to create live row for device %s', dev.id)
+						continue
+					# push update to connected clients via the bus
+					try:
+						env['bus.bus']._sendone(
+							'machine_control.live.%d' % dev.id,
+							'machine_control.live_update',
+							{
+								'status': 'ok',
+								'last_read_at': str(ts),
+								'payload': payload,
+							},
+						)
+					except Exception:
+						_logger.exception('failed to send bus notification for device %s', dev.id)
 		except Exception:
 			# swallow unexpected exceptions but keep thread alive
 			_logger.exception('mc_live_updater unexpected error')
@@ -365,37 +404,6 @@ def _start_background_updater(env):
 	# pass registry to the background thread which will open its own cursors
 	thread = threading.Thread(target=_background_updater, args=(env.registry,), daemon=True, name='mc_live_updater')
 	thread.start()
-
-
-class MachineControlCncSnapshot(models.Model):
-	_name = 'machine_control.cnc.snapshot'
-	_description = 'FANUC CNC Position Snapshot'
-	_order = 'read_at desc, id desc'
-
-	device_id = fields.Many2one('machine_control.cnc.device', required=True, ondelete='cascade', index=True)
-	read_at = fields.Datetime(required=True, default=fields.Datetime.now)
-	status = fields.Selection([
-		('ok', 'OK'),
-		('error', 'Error'),
-	], required=True)
-	error_message = fields.Text()
-	payload = fields.Text()
-
-	# Separate coordinate fields for easier display and searching
-	absolute_x = fields.Float(string='Absolute X', digits=(16, 6))
-	absolute_y = fields.Float(string='Absolute Y', digits=(16, 6))
-	absolute_z = fields.Float(string='Absolute Z', digits=(16, 6))
-	absolute_a = fields.Float(string='Absolute A', digits=(16, 6))
-
-	relative_x = fields.Float(string='Relative X', digits=(16, 6))
-	relative_y = fields.Float(string='Relative Y', digits=(16, 6))
-	relative_z = fields.Float(string='Relative Z', digits=(16, 6))
-	relative_a = fields.Float(string='Relative A', digits=(16, 6))
-
-	machine_x = fields.Float(string='Machine X', digits=(16, 6))
-	machine_y = fields.Float(string='Machine Y', digits=(16, 6))
-	machine_z = fields.Float(string='Machine Z', digits=(16, 6))
-	machine_a = fields.Float(string='Machine A', digits=(16, 6))
 
 
 class MachineControlCncLive(models.Model):

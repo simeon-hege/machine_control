@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="machine_control.LiveViewAction" owl="1">
+        <div class="o_machine_control_live_view">
+            <div class="mc_header">
+                <h1>
+                    <span>Live</span>
+                    <span class="mc_device_name" t-esc="state.deviceName"/>
+                </h1>
+                <div class="mc_status_wrap">
+                    <span class="mc_status" t-att-class="state.status === 'ok' ? 'is-ok' : state.status === 'error' ? 'is-error' : 'is-unknown'">
+                        <t t-esc="(state.status || 'unknown').toUpperCase()"/>
+                    </span>
+                    <span class="mc_last_read">
+                        Last: <t t-esc="state.lastReadAt || '-'"/>
+                    </span>
+                </div>
+            </div>
+
+            <div class="mc_grid" t-att-class="state.isLoading ? 'is-loading' : ''">
+                <div class="mc_axis_col">
+                    <h3>Absolute</h3>
+                    <div class="mc_axis_values">
+                        <div class="mc_val"><span>X</span><strong t-esc="_pretty(axisRows.x.abs)"/></div>
+                        <div class="mc_val"><span>Y</span><strong t-esc="_pretty(axisRows.y.abs)"/></div>
+                        <div class="mc_val"><span>Z</span><strong t-esc="_pretty(axisRows.z.abs)"/></div>
+                        <div class="mc_val"><span>A</span><strong t-esc="_pretty(axisRows.a.abs)"/></div>
+                    </div>
+                </div>
+                <div class="mc_axis_col">
+                    <h3>Relative</h3>
+                    <div class="mc_axis_values">
+                        <div class="mc_val"><span>X</span><strong t-esc="_pretty(axisRows.x.rel)"/></div>
+                        <div class="mc_val"><span>Y</span><strong t-esc="_pretty(axisRows.y.rel)"/></div>
+                        <div class="mc_val"><span>Z</span><strong t-esc="_pretty(axisRows.z.rel)"/></div>
+                        <div class="mc_val"><span>A</span><strong t-esc="_pretty(axisRows.a.rel)"/></div>
+                    </div>
+                </div>
+                <div class="mc_axis_col">
+                    <h3>Machine</h3>
+                    <div class="mc_axis_values">
+                        <div class="mc_val"><span>X</span><strong t-esc="_pretty(axisRows.x.mac)"/></div>
+                        <div class="mc_val"><span>Y</span><strong t-esc="_pretty(axisRows.y.mac)"/></div>
+                        <div class="mc_val"><span>Z</span><strong t-esc="_pretty(axisRows.z.mac)"/></div>
+                        <div class="mc_val"><span>A</span><strong t-esc="_pretty(axisRows.a.mac)"/></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mc_jog_controls">
+                <label for="mc_jog_step">Step</label>
+                <input
+                    id="mc_jog_step"
+                    type="number"
+                    step="0.1"
+                    t-model.number="state.jogStep"
+                    min="0"
+                />
+                <t t-foreach="['x', 'y', 'z', 'a']" t-as="axis" t-key="axis">
+                    <button type="button" class="btn btn-secondary" t-on-click="() => jogAxis(axis, 1)">
+                        <t t-esc="axis.toUpperCase()"/>+
+                    </button>
+                    <button type="button" class="btn btn-secondary" t-on-click="() => jogAxis(axis, -1)">
+                        <t t-esc="axis.toUpperCase()"/>-
+                    </button>
+                </t>
+            </div>
+
+            <div t-if="state.error" class="alert alert-danger mt-3" role="alert">
+                <t t-esc="state.error"/>
+            </div>
+        </div>
+    </t>
+</templates>

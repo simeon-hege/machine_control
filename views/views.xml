@@ -21,7 +21,6 @@
         <form string="FANUC CNC Device">
           <header>
             <button name="action_open_live" type="object" string="Live View" class="oe_link"/>
-            <button name="action_read_position" type="object" string="Read Position Now" class="oe_highlight"/>
             <button name="action_write_macro" type="object" string="Write Macro"/>
           </header>
           <sheet>
@@ -48,89 +47,7 @@
                 <field name="last_error" readonly="1"/>
                 <field name="last_position_data" readonly="1" nolabel="1"/>
               </page>
-              <page string="Snapshots">
-                <field name="snapshot_ids" readonly="1">
-                  <tree>
-                    <field name="read_at"/>
-                    <field name="status"/>
-                    <field name="absolute_x"/>
-                    <field name="absolute_y"/>
-                    <field name="absolute_z"/>
-                    <field name="relative_x"/>
-                    <field name="relative_y"/>
-                    <field name="relative_z"/>
-                    <field name="machine_x"/>
-                    <field name="machine_y"/>
-                    <field name="machine_z"/>
-                    <field name="error_message"/>
-                  </tree>
-                </field>
-              </page>
             </notebook>
-          </sheet>
-        </form>
-      </field>
-    </record>
-
-    <record id="view_machine_control_cnc_snapshot_tree" model="ir.ui.view">
-      <field name="name">machine_control.cnc.snapshot.tree</field>
-      <field name="model">machine_control.cnc.snapshot</field>
-      <field name="arch" type="xml">
-        <tree>
-          <field name="read_at"/>
-          <field name="device_id"/>
-          <field name="status"/>
-          <field name="absolute_x"/>
-          <field name="absolute_y"/>
-          <field name="absolute_z"/>
-          <field name="relative_x"/>
-          <field name="relative_y"/>
-          <field name="relative_z"/>
-          <field name="machine_x"/>
-          <field name="machine_y"/>
-          <field name="machine_z"/>
-          <field name="error_message"/>
-        </tree>
-      </field>
-    </record>
-
-    <record id="view_machine_control_cnc_snapshot_form" model="ir.ui.view">
-      <field name="name">machine_control.cnc.snapshot.form</field>
-      <field name="model">machine_control.cnc.snapshot</field>
-      <field name="arch" type="xml">
-        <form string="CNC Snapshot">
-          <sheet>
-            <group>
-              <field name="device_id" readonly="1"/>
-              <field name="read_at" readonly="1"/>
-              <field name="status" readonly="1"/>
-            </group>
-            <group string="Coordinates" colspan="3">
-              <group string="Absolute">
-                <field name="absolute_x"/>
-                <field name="absolute_y"/>
-                <field name="absolute_z"/>
-                <field name="absolute_a"/>
-              </group>
-              <group string="Relative">
-                <field name="relative_x"/>
-                <field name="relative_y"/>
-                <field name="relative_z"/>
-                <field name="relative_a"/>
-              </group>
-              <group string="Machine">
-                <field name="machine_x"/>
-                <field name="machine_y"/>
-                <field name="machine_z"/>
-                <field name="machine_a"/>
-              </group>
-            </group>
-            <group>
-              <field name="error_message" readonly="1"/>
-            </group>
-            <group>
-              <field name="payload" readonly="1" nolabel="1"/>
-            </group>
           </sheet>
         </form>
       </field>
@@ -142,12 +59,6 @@
       <field name="view_mode">tree,form</field>
     </record>
 
-    <record id="action_machine_control_cnc_snapshot" model="ir.actions.act_window">
-      <field name="name">CNC Snapshots</field>
-      <field name="res_model">machine_control.cnc.snapshot</field>
-      <field name="view_mode">tree,form</field>
-    </record>
-
     <menuitem id="menu_machine_control_root" name="Machine Control" sequence="10"/>
 
     <menuitem
@@ -156,14 +67,6 @@
       parent="menu_machine_control_root"
       action="action_machine_control_cnc_device"
       sequence="10"
-    />
-
-    <menuitem
-      id="menu_machine_control_snapshots"
-      name="CNC Snapshots"
-      parent="menu_machine_control_root"
-      action="action_machine_control_cnc_snapshot"
-      sequence="20"
     />
   </data>
 </odoo>
