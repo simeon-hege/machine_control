@@ -48,6 +48,7 @@ export class MachineControlLiveViewAction extends Component {
         });
     }
 
+    //format the numbers to 4 decimals and display "-" for null/undefined/false values
     _pretty(value) {
         if (value === false || value === null || value === undefined) {
             return "-";
