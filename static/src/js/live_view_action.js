@@ -7,6 +7,7 @@ const { Component } = owl;
 const { onWillUnmount, onWillStart, useState } = owl.hooks;
 
 const AXES = ["x", "y", "z", "a"];
+const POLL_INTERVAL_MS = 100;
 
 export class MachineControlLiveViewAction extends Component {
     setup() {
@@ -22,30 +23,27 @@ export class MachineControlLiveViewAction extends Component {
             lastReadAt: null,
             payload: null,
             error: null,
-            jogStep: 1.0,
             isLoading: true,
         });
 
         this._isDestroyed = false;
-        this._legacyBus = null;
-        this._busChannel = null;
-        this._busHandler = null;
+        this._pollTimer = null;
 
-        onWillStart(() => {
+        onWillStart(async () => {
             if (!this.deviceId) {
                 this.state.error = "Missing device id in action params.";
                 this.state.isLoading = false;
                 return;
             }
-            this._subscribeToLiveBus();
-            this._loadInitial();
+            await this._fetchLiveData();
+            this._schedulePoll();
         });
 
         onWillUnmount(() => {
             this._isDestroyed = true;
-            if (this._legacyBus && this._busHandler) {
-                this._legacyBus.off("notification", null, this._busHandler);
-                this._legacyBus.deleteChannel(this._busChannel);
+            if (this._pollTimer !== null) {
+                clearTimeout(this._pollTimer);
+                this._pollTimer = null;
             }
         });
     }
@@ -95,39 +93,26 @@ export class MachineControlLiveViewAction extends Component {
         return null;
     }
 
-    _subscribeToLiveBus() {
-        this._busChannel = "machine_control.live." + this.deviceId;
-        this._legacyBus = owl.Component.env.services.bus_service;
-        this._busHandler = (notifications) => {
-            if (this._isDestroyed) {
-                return;
-            }
-            for (const { type, payload } of notifications) {
-                if (type === "machine_control.live_update") {
-                    this._applyLiveData(payload);
-                    if (this.state.isLoading) {
-                        this.state.isLoading = false;
-                    }
-                }
-            }
-        };
-        this._legacyBus.addChannel(this._busChannel);
-        this._legacyBus.on("notification", null, this._busHandler);
-        this._legacyBus.startPolling();
+    _schedulePoll() {
+        this._pollTimer = setTimeout(async () => {
+            if (this._isDestroyed) { return; }
+            await this._fetchLiveData();
+            this._schedulePoll();
+        }, POLL_INTERVAL_MS);
     }
 
-    async _loadInitial() {
+    async _fetchLiveData() {
         try {
             const data = await this.orm.silent.call(
                 "machine_control.cnc.device",
                 "get_live_data",
-                [[this.deviceId], false]
+                [[this.deviceId]]
             );
             this._applyLiveData(data);
         } catch (error) {
             this._setError(error);
         } finally {
-            this.state.isLoading = false;
+            if (this.state.isLoading) { this.state.isLoading = false; }
         }
     }
 
@@ -145,35 +130,6 @@ export class MachineControlLiveViewAction extends Component {
         this.notification.add(message, { type: "danger" });
     }
 
-    async jogAxis(axis, sign) {
-        const step = Number(this.state.jogStep || 0);
-        if (!step) {
-            this.notification.add("Please set a non-zero jog step.", { type: "warning" });
-            return;
-        }
-        const value = sign > 0 ? step : -step;
-
-        try {
-            const result = await this.orm.call(
-                "machine_control.cnc.device",
-                "jog_from_live",
-                [[this.deviceId], axis, value]
-            );
-            if (!result || result.result !== "ok") {
-                const message = result && result.error ? result.error : "Jog failed";
-                this.notification.add(message, { type: "danger" });
-                return;
-            }
-            if (result.candidates && result.candidates.length) {
-                this.notification.add(
-                    "FOCAS direct jog symbols available: " + result.candidates.join(", "),
-                    { type: "info" }
-                );
-            }
-        } catch (error) {
-            this.notification.add((error && error.message) || "Jog failed", { type: "danger" });
-        }
-    }
 }
 
 MachineControlLiveViewAction.template = "machine_control.LiveViewAction";

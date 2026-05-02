@@ -47,25 +47,6 @@
                 </div>
             </div>
 
-            <div class="mc_jog_controls">
-                <label for="mc_jog_step">Step</label>
-                <input
-                    id="mc_jog_step"
-                    type="number"
-                    step="0.1"
-                    t-model.number="state.jogStep"
-                    min="0"
-                />
-                <t t-foreach="['x', 'y', 'z', 'a']" t-as="axis" t-key="axis">
-                    <button type="button" class="btn btn-secondary" t-on-click="() => jogAxis(axis, 1)">
-                        <t t-esc="axis.toUpperCase()"/>+
-                    </button>
-                    <button type="button" class="btn btn-secondary" t-on-click="() => jogAxis(axis, -1)">
-                        <t t-esc="axis.toUpperCase()"/>-
-                    </button>
-                </t>
-            </div>
-
             <div t-if="state.error" class="alert alert-danger mt-3" role="alert">
                 <t t-esc="state.error"/>
             </div>
