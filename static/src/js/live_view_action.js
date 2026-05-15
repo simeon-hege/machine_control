@@ -11,7 +11,7 @@ const POLL_INTERVAL_MS = 100;
 
 export class MachineControlLiveViewAction extends Component {
     setup() {
-        this.orm = useService("orm");
+        this.orm = this.env.services.orm;
         this.notification = useService("notification");
 
         const params = this.props.action && this.props.action.params ? this.props.action.params : {};
@@ -28,6 +28,7 @@ export class MachineControlLiveViewAction extends Component {
 
         this._isDestroyed = false;
         this._pollTimer = null;
+        this._lastNotifiedError = null;
 
         onWillStart(async () => {
             if (!this.deviceId) {
@@ -109,8 +110,14 @@ export class MachineControlLiveViewAction extends Component {
                 "get_live_data",
                 [[this.deviceId]]
             );
+            if (this._isDestroyed) {
+                return;
+            }
             this._applyLiveData(data);
         } catch (error) {
+            if (this._isDestroyed) {
+                return;
+            }
             this._setError(error);
         } finally {
             if (this.state.isLoading) { this.state.isLoading = false; }
@@ -122,13 +129,19 @@ export class MachineControlLiveViewAction extends Component {
         this.state.lastReadAt = data && data.last_read_at ? data.last_read_at : null;
         this.state.payload = data && data.payload ? data.payload : null;
         this.state.error = data && data.error ? data.error : null;
+        if (!this.state.error) {
+            this._lastNotifiedError = null;
+        }
     }
 
     _setError(error) {
         const message = (error && error.message) || String(error);
         this.state.status = "error";
         this.state.error = message;
-        this.notification.add(message, { type: "danger" });
+        if (message !== this._lastNotifiedError) {
+            this.notification.add(message, { type: "danger" });
+            this._lastNotifiedError = message;
+        }
     }
 
 }
